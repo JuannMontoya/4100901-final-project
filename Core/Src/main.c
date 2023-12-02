@@ -22,9 +22,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
-
+#include <ssd1306.h>
+#include <ssd1306_fonts.h>
 #include "lock.h"
 #include "keypad.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,8 +46,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
 
 RTC_HandleTypeDef hrtc;
+
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 volatile uint16_t keypad_event = KEYPAD_EVENT_NONE;
@@ -57,33 +62,100 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_RTC_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int _write(int file, char *ptr, int len)
+//uint8_t data[5] = {0};
+uint8_t i, j;
+uint8_t PinValue;
+#define RX_BUFFER_SIZE  64
+char IpAdress[]="192.168.1.1";
+uint8_t rx_buffer[RX_BUFFER_SIZE];
+char parsedIPAddress[]="192.168.1.1";
+unsigned char SSDE_LOGE[]=
+{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0xd2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0xd3, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x73, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x03, 0x84, 0x22, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc0, 0x03,
+		0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc0, 0x00, 0x38, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x0e, 0x0f, 0xff, 0x02, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		0x0f, 0xff, 0x06, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x0f, 0xff, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x40,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x74, 0x0f, 0xfe, 0x01, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x74, 0x0f, 0xfe, 0x01, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0f, 0xfe, 0x00,
+		0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x8f, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x08, 0x0f, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f,
+		0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+		0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xc0, 0x00, 0x28, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x44, 0x03, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 0x84, 0x60, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x73, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0xf3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+
+};
+//
+
+int _write(int file, char *ptr, int len)//This line defines the function signature. The function has three parameters: file, ptr, and len.
 {
   // send each byte in blocking mode
-  for (uint8_t idx = 0; idx < len; idx++) {
-	  while (LL_USART_IsActiveFlag_TXE(USART2) == 0) {
+  for (uint8_t idx = 0; idx < len; idx++) {//This for loop iterates over the data to be written. The loop variable idx is used to index into the data buffer.
+	  while (LL_USART_IsActiveFlag_TXE(USART2) == 0) {//This while loop waits until the Tx Empty flag is set, indicating that the USART2 peripheral is ready to transmit another byte.
 		  // wait until Tx Empty flag becomes true
 		  // TODO: add timeout
 	  }
-	  LL_USART_TransmitData8(USART2, ptr[idx]);
+	  LL_USART_TransmitData8(USART2, ptr[idx]);//This function transmits the byte of data at index idx in the data buffer.
   }
-  return len;
+  return len;//This line returns the number of bytes that were written.
+
 }
 
+// Startup interface with icon of designer
+void ssd1306_logo(void)
+{	  ssd1306_Reset();//reset of Display
+      ssd1306_Fill(Black);//Set color background
+	  ssd1306_SetCursor(0, 0);//set cursor for write in display
+	  ssd1306_WriteString("Final Project", Font_6x8, White);//write string in display with size font 6x8 with color white
+	  ssd1306_Line(0, 10, 128, 10, White);//Generate a line in display of color white
+	  ssd1306_DrawBitmap((SSD1306_WIDTH-84)/2, (SSD1306_HEIGHT-45)/2, SSDE_LOGE , 84, 52, White);//draw bitmap for icon
+	  ssd1306_UpdateScreen();//Refresh display
+	  HAL_Delay(5000);//Wait 5 seconds
+	  ssd1306_Reset();//reset of Display
 
 
-void keypad_it_callback(uint16_t pin)
+}
+
+void keypad_it_callback(uint16_t pin)//This line defines the function signature. The function has one parameter: pin.
 {
-	keypad_event = pin;
+	keypad_event = pin;//This line stores the pin number of the pressed button in the keypad_event variable.
 }
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -116,28 +188,70 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
-  MX_USART1_UART_Init();
   MX_RTC_Init();
+  MX_I2C2_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  lock_init();
-  keypad_init();
+  ssd1306_Init();//Initializes the SSD1306 OLED display. This function configures the display and prepares it for use.
+  ssd1306_logo();//Displays the application logo on the OLED display. This function draws the logo onto the display.
+  lock_init();// Initializes the lock system. This function sets up the lock state and prepares the system for user input.
+  keypad_init();//Initializes the keypad. This function configures the keypad GPIO pins and prepares the system for keypad input.
+ // initDHT11();//Initializes the DHT11 temperature and humidity sensor. This function configures the sensor GPIO pins and prepares the system for sensor readings.
+
+ HAL_UART_Transmit(&huart1, (uint8_t *)"AT+CIPMUX=1\r\n", 14, HAL_MAX_DELAY);  // Configurar el ESP-01 para múltiples conexiones
+ HAL_UART_Transmit(&huart1, (uint8_t *)"AT+CIPSERVER=1,23\r\n", 19, HAL_MAX_DELAY);  // Configurar el ESP-01 como servidor Telnet
+ //HAL_UART2_Transmit(&huart2, (uint8_t *)"AT+CIPSERVER=1,230\r\n", 19, HAL_MAX_DELAY);
+//  ssd1306_SetContrast(0x81);
+//  ssd1306_SetCursor(25,0);
+//  ssd1306_Fill(Black);
+//  ssd1306_WriteString("Hola :)", Font_11x18, White);
+//  ssd1306_UpdateScreen();
+//  HAL_Delay(5000);
+//  ssd1306_Reset();
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  printf("Started\r\n");
-  while (1)
+  printf("Started\r\n");//print in terminal "Started"
+  while (1)//Generate main loop
   {
-	  uint8_t key_pressed = keypad_run(&keypad_event);
-	  if (key_pressed != KEY_PRESSED_NONE) {
-		  lock_sequence_handler(key_pressed);
+	 // HAL_UART_Receive(&huart1, , ), HAL_MAX_DELAY);
+	  HAL_UART_Receive(&huart1, rx_buffer, sizeof(rx_buffer), HAL_MAX_DELAY);
+
+	  uint8_t key_pressed = keypad_run(&keypad_event);//This line calls the keypad_run() function to check if a keypad button has been pressed. The keypad_run() function takes a pointer to the keypad_event variable as an argument. The function returns the key code of the pressed button, or KEY_PRESSED_NONE if no button has been pressed.
+	  if (key_pressed != KEY_PRESSED_NONE) {//This line checks if the key_pressed variable is not equal to KEY_PRESSED_NONE. If so, this means that a keypad button has been pressed.
+		  printf("key: %c\r\n",key_pressed);//This line prints the key code of the pressed button to the console.
+		  lock_sequence_handler(key_pressed);//This line calls the lock_sequence_handler() function to handle the key press. The lock_sequence_handler() function takes the key code of the pressed button as an argument.
 	  }
+  }
+}
+
+void ESP_ConnectTelnet(void) {
+  char command[] = "AT+CIPSTART=\"TCP\",\"192.168.1.100\",23\r\n";  // Reemplaza con la dirección IP del ESP-01
+  char response[100];  // Ajusta el tamaño según tus necesidades
+
+  // Envia el comando AT para establecer la conexión Telnet
+  HAL_UART_Transmit(&huart1, (uint8_t*)command, strlen(command), HAL_MAX_DELAY);
+
+  // Espera a recibir la respuesta
+  HAL_UART_Receive(&huart1, (uint8_t*)response, sizeof(response), HAL_MAX_DELAY);
+
+  // Analiza la respuesta para obtener la dirección IP (si está disponible)
+  // ...
+
+  // Imprime la dirección IP a través de la UART
+  HAL_UART_Transmit(&huart1, (uint8_t*)"IP Address: ", strlen("IP Address: "), HAL_MAX_DELAY);
+  HAL_UART_Transmit(&huart1, (uint8_t*)parsedIPAddress, strlen(parsedIPAddress), HAL_MAX_DELAY);
+  HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+}
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+
   /* USER CODE END 3 */
-}
 
 /**
   * @brief System Clock Configuration
@@ -238,6 +352,54 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.Timing = 0x10909CEC;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
   * @brief RTC Initialization Function
   * @param None
   * @retval None
@@ -332,53 +494,23 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 0 */
 
-  LL_USART_InitTypeDef USART_InitStruct = {0};
-
-  LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
-
-  /** Initializes the peripherals clock
-  */
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
-  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* Peripheral clock enable */
-  LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_USART1);
-
-  LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOB);
-  /**USART1 GPIO Configuration
-  PB6   ------> USART1_TX
-  PB7   ------> USART1_RX
-  */
-  GPIO_InitStruct.Pin = NET_TX_Pin|NET_RX_Pin;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-  GPIO_InitStruct.Alternate = LL_GPIO_AF_7;
-  LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /* USART1 interrupt Init */
-  NVIC_SetPriority(USART1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
-  NVIC_EnableIRQ(USART1_IRQn);
-
   /* USER CODE BEGIN USART1_Init 1 */
 
   /* USER CODE END USART1_Init 1 */
-  USART_InitStruct.BaudRate = 115200;
-  USART_InitStruct.DataWidth = LL_USART_DATAWIDTH_8B;
-  USART_InitStruct.StopBits = LL_USART_STOPBITS_1;
-  USART_InitStruct.Parity = LL_USART_PARITY_NONE;
-  USART_InitStruct.TransferDirection = LL_USART_DIRECTION_TX_RX;
-  USART_InitStruct.HardwareFlowControl = LL_USART_HWCONTROL_NONE;
-  USART_InitStruct.OverSampling = LL_USART_OVERSAMPLING_16;
-  LL_USART_Init(USART1, &USART_InitStruct);
-  LL_USART_ConfigAsyncMode(USART1);
-  LL_USART_Enable(USART1);
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
@@ -565,6 +697,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
   GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /**/
+  GPIO_InitStruct.Pin = DHT11_Pin;
+  GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
+  LL_GPIO_Init(DHT11_GPIO_Port, &GPIO_InitStruct);
 
   /**/
   GPIO_InitStruct.Pin = ROW_2_Pin|ROW_4_Pin|ROW_3_Pin;
